@@ -138,6 +138,8 @@ class VideoGlazer:
                 using the encoder's text path (CLIP) or by passing a
                 zero-noise latent through the VAE.
         """
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
         count, fps, w, h = video_metadata(input_path)
         out_fps = self.config.output_fps or fps
         fourcc = cv2.VideoWriter_fourcc(*self.config.output_codec)  # type: ignore[attr-defined]
@@ -160,7 +162,7 @@ class VideoGlazer:
 
                 # --- Temporal gating ---
                 if prev_cloaked is not None and self.config.temporal_threshold > 0:
-                    sim = _frame_ssim(frame_tensor, prev_cloaked - (prev_delta or 0))
+                    sim = _frame_ssim(frame_tensor, prev_cloaked - (prev_delta if prev_delta is not None else 0))
                     if sim >= 1.0 - self.config.temporal_threshold:
                         # Re-use previous perturbation
                         cloaked = torch.clamp(frame_tensor + prev_delta, -1.0, 1.0)
