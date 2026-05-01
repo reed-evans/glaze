@@ -29,6 +29,11 @@ eval_pair.py             # Run Evaluator.compare() on outputs/{from_original,fro
 clips/                   # Source artist clips
 refs/                    # Style reference frames
 outputs/                 # Generated videos for evaluation
+
+proposal.pdf             # Proposal
+proposal_revised.pdf     # Revised proposal
+progress_report.pdf      # Progress report
+final_paper.pdf           # Final paper
 ```
 
 ## How it works
