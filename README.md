@@ -2,6 +2,35 @@
 
 A Python/PyTorch implementation of the [Glaze](https://glaze.cs.uchicago.edu/) image-cloaking algorithm, extended for video. Glaze adds imperceptible perturbations to images that cause AI style-mimicry models to misidentify the artist's style, protecting artwork from being used to train style-copying models without consent.
 
+## Architecture
+
+```
+src/glaze_video/
+├── encoders/
+│   ├── base.py          # FeatureEncoder Protocol (pluggable interface)
+│   ├── clip_encoder.py  # CLIP ViT-L/14
+│   └── vae_encoder.py   # Stable Diffusion VAE
+├── style/
+│   ├── transfer.py      # SD img2img + IP-Adapter style transfer Ω(x,T)
+│   └── selector.py      # Target style selection (50–75th percentile distance)
+├── glaze.py             # Core Adam optimization loop
+├── video.py             # VideoGlazer with temporal optimizations
+└── cli.py               # Click CLI entry points
+
+runner/
+├── metrics.py           # Evaluator: CLIP / LPIPS / Gatys-style video comparison
+├── video_io.py          # Frame reading, uniform sub-sampling, square resize
+├── modelscope.py        # ModelScope image-to-video generation wrapper
+├── extract_refs.py      # Pull reference clips from source videos
+├── mp4_to_gif.py        # Convert mp4 outputs to gif for inspection
+└── aggregate.py         # Roll up metrics across multiple video pairs
+
+eval_pair.py             # Run Evaluator.compare() on outputs/{from_original,from_glazed}.mp4
+clips/                   # Source artist clips
+refs/                    # Style reference frames
+outputs/                 # Generated videos for evaluation
+```
+
 ## How it works
 
 Glaze solves the following optimization for each image:
@@ -266,18 +295,28 @@ For maximum effectiveness, provide a style reference image. The `style-transfer`
 
 ---
 
-## Architecture
+## Evaluation
 
+The `runner/` package provides video-level similarity metrics for measuring how effective cloaking is against a downstream style-mimicry generator. The intended workflow is: (1) generate a video from an original artist clip, (2) generate a second video from the glazed version of that same clip, and (3) compare the two outputs — a successful cloak makes the generations *less* similar to each other and to the original style.
+
+`eval_pair.py` is a thin entry point that runs the `Evaluator` on a hard-coded pair of mp4s in `outputs/`:
+
+```bash
+uv run python eval_pair.py
 ```
-src/glaze_video/
-├── encoders/
-│   ├── base.py          # FeatureEncoder Protocol (pluggable interface)
-│   ├── clip_encoder.py  # CLIP ViT-L/14
-│   └── vae_encoder.py   # Stable Diffusion VAE
-├── style/
-│   ├── transfer.py      # SD img2img + IP-Adapter style transfer Ω(x,T)
-│   └── selector.py      # Target style selection (50–75th percentile distance)
-├── glaze.py             # Core Adam optimization loop
-├── video.py             # VideoGlazer with temporal optimizations
-└── cli.py               # Click CLI entry points
-```
+
+It reports three metrics, each averaged over 16 uniformly sub-sampled frames resized to 224×224:
+
+| Metric | Direction | What it measures |
+|---|---|---|
+| **CLIP similarity** | higher = more similar | Cosine similarity of CLIP ViT-L/14 image embeddings — captures high-level semantic and stylistic content. |
+| **LPIPS distance** | lower = more similar | AlexNet-backed learned perceptual distance. The same family of metric Glaze optimizes against during cloaking. |
+| **Gatys style loss** | lower = more similar | L2 distance between Gram matrices at four VGG16 layers (`conv1_2`, `conv2_2`, `conv3_3`, `conv4_3`) — the classical neural style-transfer formulation, sensitive to texture and brushwork. |
+
+The three metrics are complementary: CLIP captures semantic similarity, LPIPS captures perceptual closeness, and Gatys captures low-level texture/style. A successful glaze typically shows divergence across all three.
+
+---
+
+### Use of AI
+
+Claude code was use to aid in implementation of low level code (function level), as well as generate documentation.
