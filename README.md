@@ -281,11 +281,3 @@ src/glaze_video/
 ├── video.py             # VideoGlazer with temporal optimizations
 └── cli.py               # Click CLI entry points
 ```
-
-### Temporal optimizations (video)
-
-Applying the full Glaze optimization to every frame of a video naively would take hours per minute of footage. `VideoGlazer` implements two optimizations that make this practical:
-
-**Temporal gating**: frames that are visually near-identical to the previous frame (within `--temporal-threshold`) skip the optimizer entirely and re-use the previous perturbation. This eliminates redundant work in static shots and slow pans.
-
-**Warm start**: instead of initializing δ from zeros for each frame, the previous frame's perturbation is used as the starting point. Frames in a video are typically very similar, so the optimizer starts close to a good solution and converges in far fewer iterations.

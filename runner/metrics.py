@@ -99,11 +99,24 @@ class Evaluator:
         self.lpips_fn = lpips.LPIPS(net="alex", verbose=False).to(device).eval()
         self.style_fn = _GramStyleLoss(device=device)
 
+    def _project_image_features(self, out: object) -> torch.Tensor:
+        if isinstance(out, torch.Tensor):
+            return out
+        if hasattr(out, "image_embeds") and out.image_embeds is not None:
+            return out.image_embeds
+        if hasattr(out, "pooler_output") and out.pooler_output is not None:
+            pooled = out.pooler_output
+            proj_dim = getattr(self.clip_model.config, "projection_dim", None)
+            if proj_dim is not None and pooled.shape[-1] == proj_dim:
+                return pooled
+            return self.clip_model.visual_projection(pooled)
+        raise TypeError(f"Unexpected get_image_features output: {type(out)!r}")
+
     @torch.inference_mode()
     def _clip_embed(self, frame: np.ndarray) -> torch.Tensor:
         img = Image.fromarray(frame)
         inputs = self.clip_processor(images=img, return_tensors="pt").to(self.device)
-        feat = self.clip_model.get_image_features(**inputs)
+        feat = self._project_image_features(self.clip_model.get_image_features(**inputs))
         return F.normalize(feat, dim=-1)
 
     @torch.inference_mode()
